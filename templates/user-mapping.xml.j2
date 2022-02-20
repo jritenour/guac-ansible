@@ -1,0 +1,31 @@
+<user-mapping>
+
+    <!-- Per-user authentication and config information -->
+
+    <!-- A user using md5 to hash the password
+         guacadmin user and its md5 hashed password below is used to 
+             login to Guacamole Web UI-->
+    <authorize 
+            username="guacadmin"
+            password="f8e02631e8db6706063434dcdecf9cb7"
+            encoding="md5">
+
+        <!-- First authorized Remote connection -->
+        <connection name="Pi">
+            <protocol>ssh</protocol>
+            <param name="hostname">192.168.2.2</param>
+            <param name="port">22</param>
+        </connection>
+
+        <!-- Second authorized remote connection -->
+        <connection name="Windows Server 2019">
+            <protocol>rdp</protocol>
+            <param name="hostname">10.10.10.5</param>
+            <param name="port">3389</param>
+            <param name="username">tech</param>
+            <param name="ignore-cert">true</param>
+        </connection>
+
+    </authorize>
+
+</user-mapping>

@@ -1,0 +1,133 @@
+---
+- hosts: all
+  remote_user: "{{ user }}"
+  vars_files:
+    - vars.yaml
+  tasks:
+    - name: Install Prereq packages
+      apt: 
+        name: "{{ guac_prereq_packages }}"
+        state: present
+      become: true
+
+    - name: Add Remina apt repository
+      apt_repository: 
+        repo:  ppa:remmina-ppa-team/remmina-next-daily
+      become: true
+
+    - name: Install FreeRDP
+      apt: 
+        name: 
+          - freerdp2-dev 
+          - freerdp2-x11
+        state: present
+        update_cache: yes
+      become: true
+
+    - name: Install OpenJDK   
+      apt: 
+        name:  openjdk-11-jdk
+        state: present
+      become: true
+
+    - name: Install Tomcat
+      apt: 
+        name: "{{ tomcat_packages }}"
+        state: present
+      become: true
+
+    - name: Start and enable Tomcat
+      service: 
+        name: tomcat9
+        state: started
+        enabled: yes
+      become: true
+
+    - name: Create temp directory
+      file:
+        path: /tmp/guacamole
+        state: directory
+
+    - name: Download and untar Guacamole source tarball
+      unarchive: 
+        src: https://downloads.apache.org/guacamole/{{ guac_version }}/source/guacamole-server-{{ guac_version }}.tar.gz
+        dest: /tmp/guacamole
+        remote_src: true
+
+    - name: Configure Guacamole source
+      shell: ./configure --with-init-dir=/etc/init.d
+      args:
+        chdir: /tmp/guacamole/guacamole-server-{{ guac_version }}
+      become: true
+
+    - name: Compile Guacamole
+      make: 
+        chdir: /tmp/guacamole/guacamole-server-{{ guac_version }} 
+      become: true
+
+    - name: Install Guacamole
+      make: 
+        chdir: /tmp/guacamole/guacamole-server-{{ guac_version }}
+        target: install 
+      become: true
+
+    - name: Run ldconfig
+      command: ldconfig
+      become: true
+    
+    - name: Create directories under etc
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: tomcat
+        group: tomcat
+      become: true
+      with_items:
+        - /etc/guacamole
+        - /etc/guacamole/lib
+        - /etc/guacamole/extensions
+
+    - name: Download gauacamole client
+      get_url:
+        url: https://downloads.apache.org/guacamole/{{ guac_version}}/binary/guacamole-{{ guac_version }}.war
+        dest: /var/lib/tomcat9/webapps/guacamole.war
+      become: true
+
+    - name: Restart Tomcat
+      service: 
+        name: tomcat9
+        state: restarted
+      become: true
+
+    - name: Template Guacamole properties
+      template:
+        src: guacamole.properties.j2
+        dest: /etc/guacamole/guacamole.properties
+        owner: tomcat
+        group: tomcat
+      become: true
+
+    - name: Create password for guacuser
+      shell: echo -n "{{ guac_pass}}" | openssl md5
+      register: guac_pass_out
+
+    - name: Template Guacamole user-mapping
+      template:
+        src: user-mapping.xml.j2
+        dest: /etc/guacamole/user-mapping.xml
+        owner: tomcat
+        group: tomcat
+      become: true
+    
+    - name: Restart Tomcat
+      service:
+        name: tomcat9
+        state: restarted
+      become: true
+
+    - name: Start and enable guacamole
+      service: 
+        name: guacd
+        state: restarted
+        enabled: true        
+      become: true
